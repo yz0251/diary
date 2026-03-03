@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하루일기</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌙</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&family=Noto+Serif+KR:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface2: #f0f1f5;
+  --border: #e2e4ec;
+  --text: #1e1f2e;
+  --muted: #9395a5;
+  --accent: #6c63ff;
+  --accent2: #a78bfa;
+  --blue: #3b82f6;
+  --pink: #f43f8e;
+  --gold: #f59e0b;
+  --green: #22c55e;
+
+  /* 감정 색상 */
+  --mood-great: #22c55e;
+  --mood-good: #3b82f6;
+  --mood-meh: #f59e0b;
+  --mood-bad: #f97316;
+  --mood-awful: #f43f5e;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Nunito','Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);}
+
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 24px;background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
+  position:relative;z-index:100;flex-shrink:0;
+}
+.topbar-logo{font-size:1.1rem;font-weight:800;display:flex;align-items:center;gap:7px;letter-spacing:-0.3px;}
+.topbar-logo span{color:var(--accent);}
+.topbar-center{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;}
+.date-nav{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 14px;}
+.date-nav button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:1px 4px;transition:color 0.15s;line-height:1;}
+.date-nav button:hover{color:var(--text);}
+#dateLabel{font-size:0.88rem;font-weight:600;min-width:90px;text-align:center;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.btn-sm{padding:5px 12px;border-radius:7px;font-family:'Nunito','Noto Sans KR',sans-serif;font-size:0.73rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:all 0.15s;}
+.btn-sm:hover{color:var(--text);border-color:var(--accent);}
+.btn-sm.hl{border-color:var(--accent);color:var(--accent);}
+.btn-sm.hl:hover{background:rgba(108,99,255,0.08);}
+
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.main{flex:1;display:grid;grid-template-columns:300px 1fr 260px;gap:0;overflow:hidden;min-height:0;}
+
+/* ── 왼쪽: 달력 + 통계 ── */
+.left-col{
+  display:flex;flex-direction:column;gap:0;
+  border-right:1px solid var(--border);
+  overflow-y:auto;background:var(--surface);
+}
+.left-col::-webkit-scrollbar{width:3px;}
+.left-col::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ── 달력 ── */
+.cal-section{padding:16px;}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cal-head-title{font-size:0.9rem;font-weight:700;}
+.cal-head-nav{display:flex;gap:4px;}
+.cal-nav-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:2px 5px;border-radius:5px;transition:all 0.15s;}
+.cal-nav-btn:hover{color:var(--text);background:var(--surface2);}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:3px;}
+.cal-dow span{text-align:center;font-size:0.6rem;font-weight:700;color:var(--muted);padding:3px 0;letter-spacing:0.3px;}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;}
+.cal-day{
+  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;border-radius:7px;cursor:pointer;position:relative;
+  transition:all 0.15s;font-size:0.75rem;font-weight:500;
+}
+.cal-day:hover{background:var(--surface2);}
+.cal-day.empty{cursor:default;pointer-events:none;}
+.cal-day.today{background:rgba(108,99,255,0.08);color:var(--accent);font-weight:800;}
+.cal-day.selected{background:var(--accent);color:#fff;font-weight:700;}
+.cal-day.selected:hover{background:#5a52d5;}
+.cal-day.has-entry::after{
+  content:'';position:absolute;bottom:2px;
+  width:4px;height:4px;border-radius:50%;background:var(--accent);
+}
+.cal-day.selected::after{background:rgba(255,255,255,0.7);}
+/* 감정 dot */
+.cal-day.mood-great.has-entry::after{background:var(--mood-great);}
+.cal-day.mood-good.has-entry::after{background:var(--mood-good);}
+.cal-day.mood-meh.has-entry::after{background:var(--mood-meh);}
+.cal-day.mood-bad.has-entry::after{background:var(--mood-bad);}
+.cal-day.mood-awful.has-entry::after{background:var(--mood-awful);}
+.cal-day.selected::after{background:rgba(255,255,255,0.8) !important;}
+
+/* ── 이번달 통계 ── */
+.stats-section{padding:0 16px 16px;}
+.stats-title{font-size:0.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+.stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;}
+.stat-lbl{font-size:0.6rem;color:var(--muted);margin-bottom:2px;letter-spacing:0.3px;}
+.stat-val{font-size:1.1rem;font-weight:800;color:var(--accent);}
+.stat-val.streak{color:var(--gold);}
+
+/* 감정 분포 */
+.mood-dist{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.mood-dist-title{font-size:0.65rem;color:var(--muted);margin-bottom:8px;}
+.mood-bar-row{display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+.mood-emoji{font-size:0.85rem;width:20px;text-align:center;flex-shrink:0;}
+.mood-bar-bg{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.mood-bar-fill{height:100%;border-radius:3px;transition:width 0.5s ease;}
+.mood-bar-cnt{font-size:0.62rem;font-weight:700;color:var(--muted);width:16px;text-align:right;flex-shrink:0;}
+
+/* ── 가운데: 에디터 ── */
+.center-col{
+  display:flex;flex-direction:column;overflow:hidden;min-height:0;
+  background:var(--bg);
+}
+.editor-top{
+  padding:14px 24px 10px;flex-shrink:0;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.editor-date-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.editor-date{font-family:'Noto Serif KR',serif;font-size:1rem;font-weight:600;color:var(--text);}
+.editor-date .weekday{font-size:0.75rem;font-weight:400;color:var(--muted);margin-left:8px;font-family:'Nunito',sans-serif;}
+.mood-picker{display:flex;gap:5px;align-items:center;}
+.mood-btn{
+  width:32px;height:32px;border-radius:8px;border:2px solid transparent;
+  background:var(--surface2);cursor:pointer;font-size:1rem;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;position:relative;
+}
+.mood-btn:hover{transform:scale(1.15);}
+.mood-btn.active{border-color:var(--accent);background:rgba(108,99,255,0.1);transform:scale(1.1);}
+.mood-btn[data-mood="great"].active{border-color:var(--mood-great);background:rgba(34,197,94,0.1);}
+.mood-btn[data-mood="good"].active{border-color:var(--mood-good);background:rgba(59,130,246,0.1);}
+.mood-btn[data-mood="meh"].active{border-color:var(--mood-meh);background:rgba(245,158,11,0.1);}
+.mood-btn[data-mood="bad"].active{border-color:var(--mood-bad);background:rgba(249,115,22,0.1);}
+.mood-btn[data-mood="awful"].active{border-color:var(--mood-awful);background:rgba(244,63,94,0.1);}
+
+/* 태그 */
+.tag-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.tag{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 8px;border-radius:20px;
+  background:rgba(108,99,255,0.08);color:var(--accent);
+  font-size:0.68rem;font-weight:700;cursor:pointer;
+  border:1px solid rgba(108,99,255,0.2);transition:all 0.15s;
+}
+.tag:hover{background:rgba(108,99,255,0.15);}
+.tag .del{color:var(--muted);font-size:0.8rem;margin-left:1px;}
+.tag-inp{
+  background:none;border:1px dashed var(--border);border-radius:20px;
+  padding:2px 8px;font-size:0.68rem;color:var(--text);outline:none;
+  font-family:'Nunito',sans-serif;width:80px;transition:border-color 0.15s;
+}
+.tag-inp:focus{border-color:var(--accent);}
+.tag-inp::placeholder{color:var(--muted);}
+
+/* 에디터 본문 */
+.editor-body{flex:1;overflow-y:auto;padding:20px 24px;min-height:0;}
+.editor-body::-webkit-scrollbar{width:4px;}
+.editor-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+.editor-placeholder{
+  font-family:'Noto Serif KR',serif;font-size:1.5rem;font-weight:300;
+  color:#ccc;pointer-events:none;position:absolute;top:20px;left:24px;right:24px;
+  line-height:1.8;
+}
+.diary-textarea{
+  width:100%;height:100%;min-height:200px;
+  font-family:'Noto Serif KR',serif;font-size:1.05rem;font-weight:300;
+  color:var(--text);background:transparent;border:none;outline:none;
+  resize:none;line-height:1.95;letter-spacing:0.01em;
+}
+.diary-textarea::placeholder{color:#c8cad8;}
+
+/* 하단 툴바 */
+.editor-bottom{
+  padding:8px 20px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);flex-shrink:0;
+}
+.char-count{font-size:0.72rem;color:var(--muted);}
+.char-count span{color:var(--accent);font-weight:700;}
+.save-btn{
+  padding:7px 20px;background:var(--accent);color:#fff;
+  border:none;border-radius:8px;font-family:'Nunito',sans-serif;
+  font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.15s;
+  display:flex;align-items:center;gap:6px;
+}
+.save-btn:hover{background:#5a52d5;transform:translateY(-1px);}
+.save-btn:active{transform:translateY(0);}
+.save-btn.saved{background:var(--green);}
+.delete-btn{
+  padding:6px 12px;background:transparent;color:var(--muted);
+  border:1px solid var(--border);border-radius:7px;
+  font-family:'Nunito',sans-serif;font-size:0.73rem;font-weight:600;
+  cursor:pointer;transition:all 0.15s;
+}
+.delete-btn:hover{color:var(--mood-awful);border-color:var(--mood-awful);}
+
+/* ── 오른쪽: 최근 일기 목록 ── */
+.right-col{
+  border-left:1px solid var(--border);display:flex;
+  flex-direction:column;overflow:hidden;background:var(--surface);
+}
+.right-head{
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+}
+.right-head-title{font-size:0.82rem;font-weight:700;}
+.search-inp{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:5px 10px;color:var(--text);
+  font-family:'Nunito','Noto Sans KR',sans-serif;font-size:0.77rem;
+  outline:none;transition:border-color 0.2s;margin:0 14px 10px;
+  width:calc(100% - 28px);
+}
+.search-inp:focus{border-color:var(--accent);}
+.search-inp::placeholder{color:var(--muted);}
+.diary-list{flex:1;overflow-y:auto;min-height:0;}
+.diary-list::-webkit-scrollbar{width:3px;}
+.diary-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.diary-item{
+  padding:12px 14px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background 0.15s;
+  display:flex;flex-direction:column;gap:4px;
+}
+.diary-item:hover{background:rgba(108,99,255,0.04);}
+.diary-item.active{background:rgba(108,99,255,0.07);}
+.di-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.di-date{font-size:0.72rem;font-weight:700;color:var(--muted);}
+.di-mood{font-size:0.85rem;}
+.di-tags{display:flex;gap:3px;flex-wrap:wrap;}
+.di-tag{
+  font-size:0.58rem;font-weight:700;color:var(--accent);
+  background:rgba(108,99,255,0.08);border-radius:10px;
+  padding:1px 5px;
+}
+.di-preview{
+  font-family:'Noto Serif KR',serif;font-size:0.78rem;
+  color:var(--text);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.di-preview.empty{color:var(--muted);font-style:italic;font-family:'Nunito',sans-serif;font-size:0.72rem;}
+.diary-empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:0.8rem;line-height:2;}
+.diary-empty .ei{font-size:2rem;margin-bottom:8px;}
+
+/* ── 토스트 ── */
+.toast{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--text);color:#fff;padding:10px 20px;border-radius:10px;
+  font-size:0.82rem;font-weight:600;opacity:0;pointer-events:none;
+  transition:all 0.3s;z-index:999;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── 반응형 ── */
+@media(max-width:900px){
+  .main{grid-template-columns:1fr;}
+  .left-col,.right-col{display:none;}
+}
+
+/* 자동저장 인디케이터 */
+.autosave{font-size:0.68rem;color:var(--muted);display:flex;align-items:center;gap:4px;}
+.autosave .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+.autosave .dot.saving{background:var(--gold);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+/* 이미지 업로드 영역 */
+.img-drop-hint{
+  margin-top:16px;padding:12px;border:1.5px dashed var(--border);border-radius:10px;
+  text-align:center;color:var(--muted);font-size:0.72rem;cursor:pointer;
+  transition:all 0.2s;
+}
+.img-drop-hint:hover{border-color:var(--accent);color:var(--accent);background:rgba(108,99,255,0.04);}
+.img-thumb-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.img-thumb{
+  width:60px;height:60px;border-radius:8px;object-fit:cover;
+  border:2px solid var(--border);cursor:pointer;transition:border-color 0.15s;
+  position:relative;
+}
+.img-thumb:hover{border-color:var(--accent);}
+.img-thumb-wrap{position:relative;display:inline-block;}
+.img-del{
+  position:absolute;top:-5px;right:-5px;width:16px;height:16px;
+  border-radius:50%;background:var(--mood-awful);color:#fff;
+  border:none;cursor:pointer;font-size:0.6rem;display:flex;
+  align-items:center;justify-content:center;line-height:1;
+}
+
+/* 날씨 픽커 */
+.weather-row{display:flex;align-items:center;gap:4px;margin-top:6px;}
+.weather-lbl{font-size:0.65rem;color:var(--muted);margin-right:2px;}
+.weather-btn{
+  background:none;border:1.5px solid transparent;border-radius:6px;
+  padding:2px 5px;font-size:0.9rem;cursor:pointer;transition:all 0.15s;
+}
+.weather-btn:hover{background:var(--surface2);}
+.weather-btn.active{border-color:var(--accent);background:rgba(108,99,255,0.08);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">🌙 <span>하루일기</span></div>
+    <div class="topbar-center">
+      <div class="date-nav">
+        <button id="prevDayBtn">‹</button>
+        <span id="dateLabel"></span>
+        <button id="nextDayBtn">›</button>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-sm" id="todayBtn">오늘</button>
+      <button class="btn-sm hl" id="exportBtn">📤 내보내기</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 왼쪽: 달력 + 통계 -->
+    <div class="left-col">
+      <div class="cal-section">
+        <div class="cal-head">
+          <span class="cal-head-title" id="calMonthLabel"></span>
+          <div class="cal-head-nav">
+            <button class="cal-nav-btn" id="calPrevBtn">‹</button>
+            <button class="cal-nav-btn" id="calNextBtn">›</button>
+          </div>
+        </div>
+        <div class="cal-dow">
+          <span style="color:#f87171">일</span><span>월</span><span>화</span>
+          <span>수</span><span>목</span><span>금</span><span style="color:var(--blue)">토</span>
+        </div>
+        <div class="cal-days" id="calDays"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="stats-title">이번달 기록</div>
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-lbl">작성한 일기</div>
+            <div class="stat-val" id="statCount">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-lbl">🔥 연속 기록</div>
+            <div class="stat-val streak" id="statStreak">0</div>
+          </div>
+        </div>
+        <div class="mood-dist" id="moodDist"></div>
+      </div>
+    </div>
+
+    <!-- 가운데: 에디터 -->
+    <div class="center-col">
+      <div class="editor-top">
+        <div class="editor-date-row">
+          <div class="editor-date" id="editorDateFull"></div>
+          <div class="mood-picker">
+            <button class="mood-btn" data-mood="great" title="아주 좋아요">😄</button>
+            <button class="mood-btn" data-mood="good" title="좋아요">🙂</button>
+            <button class="mood-btn" data-mood="meh" title="그저 그래요">😐</button>
+            <button class="mood-btn" data-mood="bad" title="별로예요">😔</button>
+            <button class="mood-btn" data-mood="awful" title="최악이에요">😞</button>
+          </div>
+        </div>
+        <div class="weather-row">
+          <span class="weather-lbl">날씨</span>
+          <button class="weather-btn" data-weather="☀️" title="맑음">☀️</button>
+          <button class="weather-btn" data-weather="⛅" title="구름조금">⛅</button>
+          <button class="weather-btn" data-weather="☁️" title="흐림">☁️</button>
+          <button class="weather-btn" data-weather="🌧️" title="비">🌧️</button>
+          <button class="weather-btn" data-weather="❄️" title="눈">❄️</button>
+          <button class="weather-btn" data-weather="⛈️" title="천둥번개">⛈️</button>
+        </div>
+        <div class="tag-row" id="tagRow" style="margin-top:8px;">
+          <input class="tag-inp" id="tagInp" placeholder="# 태그 추가">
+        </div>
+      </div>
+
+      <div class="editor-body" id="editorBody">
+        <textarea class="diary-textarea" id="diaryTextarea"
+          placeholder="오늘 하루는 어땠나요?&#10;&#10;한 줄이어도, 길어도 괜찮아요.&#10;당신의 하루를 기록해 보세요 ✍️"></textarea>
+      </div>
+
+      <div class="editor-bottom">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="autosave" id="autosaveIndicator">
+            <div class="dot"></div>
+            <span>저장됨</span>
+          </div>
+          <div class="char-count"><span id="charCount">0</span>자</div>
+          <button class="delete-btn" id="deleteBtn">삭제</button>
+        </div>
+        <button class="save-btn" id="saveBtn">
+          <span>💾</span> 저장하기
+        </button>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 일기 목록 -->
+    <div class="right-col">
+      <div class="right-head">
+        <span class="right-head-title">📚 일기 목록</span>
+        <span id="totalCount" style="font-size:0.72rem;color:var(--muted);">0개</span>
+      </div>
+      <input class="search-inp" id="searchInp" placeholder="🔍 일기 검색...">
+      <div class="diary-list" id="diaryList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 상태 ─────────────────────────────────
+let diaries = {}; // { 'YYYY-MM-DD': { text, mood, weather, tags, savedAt } }
+let currentDate = todayStr();
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth() + 1;
+let autosaveTimer = null;
+let currentMood = '';
+let currentWeather = '';
+let currentTags = [];
+
+const MOOD_EMOJI = { great:'😄', good:'🙂', meh:'😐', bad:'😔', awful:'😞' };
+const MOOD_LABEL = { great:'아주 좋아요', good:'좋아요', meh:'그저 그래요', bad:'별로예요', awful:'최악이에요' };
+const MOOD_COLOR = { great:'var(--mood-great)', good:'var(--mood-good)', meh:'var(--mood-meh)', bad:'var(--mood-bad)', awful:'var(--mood-awful)' };
+const WEEKDAYS = ['일','월','화','수','목','금','토'];
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// ── 로컬스토리지 ─────────────────────────
+function loadData() {
+  try { diaries = JSON.parse(localStorage.getItem('haru_diaries') || '{}'); } catch(e) { diaries = {}; }
+}
+function saveData() {
+  try { localStorage.setItem('haru_diaries', JSON.stringify(diaries)); } catch(e) {}
+}
+
+// ── 날짜 유틸 ────────────────────────────
+function parseDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function formatDateFull(s) {
+  const d = parseDate(s);
+  const [y,m,day] = s.split('-').map(Number);
+  return `${y}년 ${m}월 ${day}일`;
+}
+function getWeekday(s) {
+  return WEEKDAYS[parseDate(s).getDay()]+'요일';
+}
+function offsetDate(s, n) {
+  const d = parseDate(s);
+  d.setDate(d.getDate() + n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// ── 에디터 로드 ──────────────────────────
+function loadEditor(dateStr) {
+  currentDate = dateStr;
+
+  // 날짜 표시
+  document.getElementById('dateLabel').textContent = (() => {
+    const [y,m,d] = dateStr.split('-').map(Number);
+    return `${y}년 ${m}월 ${d}일`;
+  })();
+  document.getElementById('editorDateFull').innerHTML =
+    formatDateFull(dateStr) + ` <span class="weekday">${getWeekday(dateStr)}</span>`;
+
+  const entry = diaries[dateStr] || {};
+
+  // 텍스트
+  document.getElementById('diaryTextarea').value = entry.text || '';
+  updateCharCount();
+
+  // 감정
+  currentMood = entry.mood || '';
+  document.querySelectorAll('.mood-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mood === currentMood);
+  });
+
+  // 날씨
+  currentWeather = entry.weather || '';
+  document.querySelectorAll('.weather-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.weather === currentWeather);
+  });
+
+  // 태그
+  currentTags = entry.tags ? [...entry.tags] : [];
+  renderTags();
+
+  // 자동저장 상태
+  updateAutosaveLabel('saved');
+
+  // 달력 재렌더
+  renderCalendar();
+  renderDiaryList();
+}
+
+// ── 저장 ─────────────────────────────────
+function saveEntry(auto = false) {
+  const text = document.getElementById('diaryTextarea').value.trim();
+
+  if (!text && !currentMood && !currentWeather && currentTags.length === 0) {
+    // 아무것도 없으면 삭제
+    delete diaries[currentDate];
+  } else {
+    diaries[currentDate] = {
+      text,
+      mood: currentMood,
+      weather: currentWeather,
+      tags: [...currentTags],
+      savedAt: new Date().toISOString()
+    };
+  }
+  saveData();
+  updateAutosaveLabel('saved');
+  renderCalendar();
+  renderDiaryList();
+  renderStats();
+
+  if (!auto) {
+    const btn = document.getElementById('saveBtn');
+    btn.classList.add('saved');
+    btn.innerHTML = '<span>✅</span> 저장됨!';
+    showToast('일기가 저장되었어요 ✍️');
+    setTimeout(() => {
+      btn.classList.remove('saved');
+      btn.innerHTML = '<span>💾</span> 저장하기';
+    }, 2000);
+  }
+}
+
+function autoSave() {
+  clearTimeout(autosaveTimer);
+  updateAutosaveLabel('saving');
+  autosaveTimer = setTimeout(() => saveEntry(true), 1200);
+}
+
+function updateAutosaveLabel(state) {
+  const el = document.getElementById('autosaveIndicator');
+  const dot = el.querySelector('.dot');
+  const lbl = el.querySelector('span');
+  if (state === 'saving') {
+    dot.classList.add('saving');
+    lbl.textContent = '저장 중...';
+  } else {
+    dot.classList.remove('saving');
+    lbl.textContent = diaries[currentDate] ? '저장됨' : '미저장';
+  }
+}
+
+function updateCharCount() {
+  const len = document.getElementById('diaryTextarea').value.length;
+  document.getElementById('charCount').textContent = len.toLocaleString('ko-KR');
+}
+
+// ── 태그 ─────────────────────────────────
+function renderTags() {
+  const row = document.getElementById('tagRow');
+  const inp = document.getElementById('tagInp');
+  // 기존 태그 삭제
+  row.querySelectorAll('.tag').forEach(t => t.remove());
+  // 새로 렌더
+  currentTags.forEach((tag, i) => {
+    const el = document.createElement('span');
+    el.className = 'tag';
+    el.innerHTML = `#${escHtml(tag)} <span class="del" data-i="${i}">×</span>`;
+    el.querySelector('.del').addEventListener('click', e => {
+      e.stopPropagation();
+      currentTags.splice(i, 1);
+      renderTags(); autoSave();
+    });
+    row.insertBefore(el, inp);
+  });
+}
+
+function addTag(val) {
+  const t = val.trim().replace(/^#/, '');
+  if (!t || currentTags.includes(t)) return;
+  currentTags.push(t);
+  renderTags();
+  autoSave();
+}
+
+// ── 달력 ─────────────────────────────────
+function renderCalendar() {
+  document.getElementById('calMonthLabel').textContent = `${calYear}년 ${MONTHS[calMonth-1]}`;
+  const firstDay = new Date(calYear, calMonth-1, 1).getDay();
+  const lastDate = new Date(calYear, calMonth, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const container = document.getElementById('calDays');
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= lastDate; d++) {
+    const ds = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const entryDate = new Date(calYear, calMonth-1, d);
+    const isToday = entryDate.getTime() === today.getTime();
+    const isSel = ds === currentDate;
+    const entry = diaries[ds];
+    const hasMood = entry?.mood ? ` mood-${entry.mood}` : '';
+    let cls = `cal-day${isToday?' today':''}${isSel?' selected':''}${entry?' has-entry':''}${hasMood}`;
+    html += `<div class="${cls}" data-date="${ds}">${d}</div>`;
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.cal-day:not(.empty)').forEach(el => {
+    el.addEventListener('click', () => {
+      loadEditor(el.dataset.date);
+    });
+  });
+}
+
+// ── 통계 ─────────────────────────────────
+function renderStats() {
+  const prefix = `${calYear}-${String(calMonth).padStart(2,'0')}`;
+  const monthEntries = Object.entries(diaries).filter(([k]) => k.startsWith(prefix));
+  document.getElementById('statCount').textContent = monthEntries.length + '일';
+
+  // 연속 기록 (오늘부터 역산)
+  let streak = 0;
+  let d = new Date(); d.setHours(0,0,0,0);
+  while (true) {
+    const ds = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if (diaries[ds]) { streak++; d.setDate(d.getDate()-1); }
+    else break;
+  }
+  document.getElementById('statStreak').textContent = streak + '일';
+
+  // 감정 분포
+  const moods = { great:0, good:0, meh:0, bad:0, awful:0 };
+  monthEntries.forEach(([,v]) => { if (v.mood) moods[v.mood]++; });
+  const maxM = Math.max(...Object.values(moods), 1);
+  const moodEl = document.getElementById('moodDist');
+  moodEl.innerHTML = `<div class="mood-dist-title">😊 이번달 감정 분포</div>` +
+    Object.entries(moods).map(([mood, cnt]) =>
+      `<div class="mood-bar-row">
+        <span class="mood-emoji">${MOOD_EMOJI[mood]}</span>
+        <div class="mood-bar-bg"><div class="mood-bar-fill" style="width:${Math.round(cnt/maxM*100)}%;background:${MOOD_COLOR[mood]};"></div></div>
+        <span class="mood-bar-cnt">${cnt}</span>
+      </div>`
+    ).join('');
+}
+
+// ── 일기 목록 ────────────────────────────
+function renderDiaryList() {
+  const q = (document.getElementById('searchInp').value || '').toLowerCase();
+  const all = Object.entries(diaries)
+    .filter(([k, v]) => {
+      if (!q) return true;
+      return v.text?.toLowerCase().includes(q) ||
+             v.tags?.some(t => t.toLowerCase().includes(q));
+    })
+    .sort(([a],[b]) => b.localeCompare(a));
+
+  document.getElementById('totalCount').textContent = Object.keys(diaries).length + '개';
+
+  const el = document.getElementById('diaryList');
+  if (!all.length) {
+    el.innerHTML = `<div class="diary-empty"><div class="ei">${q ? '🔍' : '📖'}</div>${q ? '검색 결과가 없어요.' : '아직 작성한 일기가 없어요.<br>오늘의 하루를 기록해 보세요!'}</div>`;
+    return;
+  }
+
+  el.innerHTML = all.map(([date, entry]) => {
+    const [y,m,d] = date.split('-').map(Number);
+    const dateDisp = `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')} ${WEEKDAYS[parseDate(date).getDay()]}`;
+    const tagsHtml = entry.tags?.length
+      ? entry.tags.map(t => `<span class="di-tag">#${escHtml(t)}</span>`).join('')
+      : '';
+    const preview = entry.text?.trim() || '';
+    return `<div class="diary-item${date===currentDate?' active':''}" data-date="${date}">
+      <div class="di-top">
+        <span class="di-date">${dateDisp}</span>
+        <span class="di-mood">${entry.mood ? MOOD_EMOJI[entry.mood] : ''}${entry.weather || ''}</span>
+      </div>
+      ${tagsHtml ? `<div class="di-tags">${tagsHtml}</div>` : ''}
+      <div class="di-preview${preview ? '' : ' empty'}">${preview ? escHtml(preview.slice(0,80))+(preview.length>80?'…':'') : '내용 없음'}</div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.diary-item').forEach(item => {
+    item.addEventListener('click', () => loadEditor(item.dataset.date));
+  });
+}
+
+// ── 유틸 ─────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── 내보내기 ─────────────────────────────
+function exportDiaries() {
+  const all = Object.entries(diaries).sort(([a],[b]) => a.localeCompare(b));
+  if (!all.length) { showToast('내보낼 일기가 없어요.'); return; }
+  const lines = all.map(([date, e]) => {
+    const parts = [`📅 ${formatDateFull(date)} (${getWeekday(date)})`];
+    if (e.mood) parts.push(`😊 오늘의 감정: ${MOOD_LABEL[e.mood]}`);
+    if (e.weather) parts.push(`${e.weather} 날씨`);
+    if (e.tags?.length) parts.push(`🏷 태그: ${e.tags.map(t=>'#'+t).join(' ')}`);
+    parts.push('');
+    parts.push(e.text || '(내용 없음)');
+    parts.push('\n---\n');
+    return parts.join('\n');
+  });
+  const blob = new Blob(['\uFEFF'+lines.join('\n')], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `하루일기_${new Date().toISOString().split('T')[0]}.txt`;
+  a.click();
+  showToast('일기를 내보냈어요 📤');
+}
+
+// ── 이벤트 리스너 ────────────────────────
+function init() {
+  loadData();
+  loadEditor(currentDate);
+  renderStats();
+
+  // 날짜 이동
+  document.getElementById('prevDayBtn').addEventListener('click', () => {
+    loadEditor(offsetDate(currentDate, -1));
+    syncCalMonth();
+  });
+  document.getElementById('nextDayBtn').addEventListener('click', () => {
+    const next = offsetDate(currentDate, 1);
+    if (next <= todayStr()) { loadEditor(next); syncCalMonth(); }
+  });
+  document.getElementById('todayBtn').addEventListener('click', () => {
+    loadEditor(todayStr()); syncCalMonth();
+  });
+
+  // 달력 월 이동
+  document.getElementById('calPrevBtn').addEventListener('click', () => {
+    calMonth--; if (calMonth < 1) { calMonth = 12; calYear--; }
+    renderCalendar(); renderStats();
+  });
+  document.getElementById('calNextBtn').addEventListener('click', () => {
+    calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; }
+    renderCalendar(); renderStats();
+  });
+
+  // 텍스트 변경 → 자동저장
+  document.getElementById('diaryTextarea').addEventListener('input', () => {
+    updateCharCount(); autoSave();
+  });
+
+  // 저장 버튼
+  document.getElementById('saveBtn').addEventListener('click', () => saveEntry(false));
+
+  // 삭제 버튼
+  document.getElementById('deleteBtn').addEventListener('click', () => {
+    if (!diaries[currentDate]) { showToast('삭제할 일기가 없어요.'); return; }
+    if (!confirm('오늘 일기를 삭제할까요?')) return;
+    delete diaries[currentDate];
+    saveData();
+    loadEditor(currentDate);
+    showToast('일기를 삭제했어요.');
+  });
+
+  // 감정 버튼
+  document.querySelectorAll('.mood-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mood = btn.dataset.mood;
+      currentMood = currentMood === mood ? '' : mood;
+      document.querySelectorAll('.mood-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mood === currentMood)
+      );
+      autoSave();
+    });
+  });
+
+  // 날씨 버튼
+  document.querySelectorAll('.weather-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const w = btn.dataset.weather;
+      currentWeather = currentWeather === w ? '' : w;
+      document.querySelectorAll('.weather-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.weather === currentWeather)
+      );
+      autoSave();
+    });
+  });
+
+  // 태그 입력
+  const tagInp = document.getElementById('tagInp');
+  tagInp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInp.value);
+      tagInp.value = '';
+    }
+    if (e.key === 'Backspace' && !tagInp.value && currentTags.length) {
+      currentTags.pop(); renderTags(); autoSave();
+    }
+  });
+  tagInp.addEventListener('blur', () => {
+    if (tagInp.value.trim()) { addTag(tagInp.value); tagInp.value = ''; }
+  });
+
+  // 검색
+  document.getElementById('searchInp').addEventListener('input', renderDiaryList);
+
+  // 내보내기
+  document.getElementById('exportBtn').addEventListener('click', exportDiaries);
+
+  // Ctrl+S 단축키
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault(); saveEntry(false);
+    }
+  });
+}
+
+function syncCalMonth() {
+  const [y, m] = currentDate.split('-').map(Number);
+  calYear = y; calMonth = m;
+  renderCalendar(); renderStats();
+}
+
+init();
+</script>
+</body>
+</html>
