@@ -145,6 +145,19 @@ body{font-family:'Nunito','Noto Sans KR',sans-serif;background:var(--bg);color:v
 .diary-textarea{width:100%;height:100%;min-height:200px;font-family:'Nunito','Noto Sans KR',sans-serif;font-size:0.97rem;font-weight:400;color:var(--text);background:transparent;border:none;outline:none;resize:none;line-height:1.95;}
 .diary-textarea::placeholder{color:#c8cad8;}
 
+/* 읽기모드 텍스트 */
+.read-body{font-family:'Nunito','Noto Sans KR',sans-serif;font-size:0.97rem;line-height:1.95;white-space:pre-wrap;word-break:break-all;color:var(--text);}
+.read-body.no-content{color:var(--muted);font-style:italic;font-size:0.88rem;}
+/* 읽기모드일때 헤더 잠금 */
+.is-read-mode .title-inp{pointer-events:none;}
+.is-read-mode .mood-btn{pointer-events:none;cursor:default;}
+.is-read-mode .weather-btn{pointer-events:none;cursor:default;}
+.is-read-mode .weather-btn:not(.active){opacity:0.18;}
+.is-read-mode .tag-inp{display:none;}
+.is-read-mode .tag .del{display:none;}
+.is-read-mode .tag{cursor:default;}
+.is-read-mode .tag:hover{background:rgba(108,99,255,0.08);}
+
 /* 하단 */
 .editor-bottom{padding:8px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);flex-shrink:0;}
 .bottom-left{display:flex;align-items:center;gap:10px;}
@@ -255,7 +268,7 @@ body{font-family:'Nunito','Noto Sans KR',sans-serif;background:var(--bg);color:v
             <button class="mood-btn" data-mood="awful" title="최악이에요">😞</button>
           </div>
         </div>
-        <input class="title-inp" id="titleInp" placeholder="제목을 입력하세요 (선택)" spellcheck="false">
+        <input class="title-inp" id="titleInp" spellcheck="false" placeholder="제목을 입력하세요 (선택)">
         <div class="weather-row">
           <span class="weather-lbl">날씨</span>
           <button class="weather-btn" data-weather="☀️">☀️</button>
@@ -270,9 +283,10 @@ body{font-family:'Nunito','Noto Sans KR',sans-serif;background:var(--bg);color:v
         </div>
       </div>
 
-      <div class="editor-body">
-        <textarea class="diary-textarea" id="diaryTextarea"
-          placeholder="오늘 하루는..." spellcheck="false"></textarea>
+      <div class="editor-body" id="editorBody">
+        <div class="read-body" id="readBody" style="display:none;"></div>
+        <textarea class="diary-textarea" id="diaryTextarea" spellcheck="false"
+          placeholder="오늘 하루는..."></textarea>
       </div>
 
       <div class="editor-bottom">
@@ -313,6 +327,7 @@ let autosaveTimer = null;
 let currentMood = '';
 let currentWeather = '';
 let currentTags = [];
+let isReadMode = false;
 
 const MOOD_EMOJI = { great:'😄', good:'🙂', meh:'😐', bad:'😔', awful:'😞' };
 const MOOD_LABEL = { great:'아주 좋아요', good:'좋아요', meh:'그저 그래요', bad:'별로예요', awful:'최악이에요' };
@@ -331,14 +346,49 @@ function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function loadData(){ try{ diaries=JSON.parse(localStorage.getItem('haru_diaries')||'{}'); }catch(e){ diaries={}; } }
 function saveData(){ try{ localStorage.setItem('haru_diaries',JSON.stringify(diaries)); }catch(e){} }
 
+// ── 읽기/쓰기 모드 전환 ───────────────
+function setMode(mode) {
+  isReadMode = (mode === 'read');
+  const centerCol = document.querySelector('.center-col');
+  const textarea  = document.getElementById('diaryTextarea');
+  const readBody  = document.getElementById('readBody');
+  const charWrap  = document.querySelector('.char-count');
+  const autoWrap  = document.getElementById('autosaveIndicator');
+  const btn       = document.getElementById('saveBtn');
+
+  if (isReadMode) {
+    centerCol.classList.add('is-read-mode');
+    textarea.style.display = 'none';
+    const txt = textarea.value.trim();
+    readBody.textContent = txt || '내용이 없어요.';
+    readBody.className = 'read-body' + (txt ? '' : ' no-content');
+    readBody.style.display = 'block';
+    charWrap.style.visibility = 'hidden';
+    autoWrap.style.visibility = 'hidden';
+    btn.classList.remove('confirmed');
+    btn.classList.add('edit-mode');
+    document.getElementById('saveBtnIcon').textContent = '✏️';
+    document.getElementById('saveBtnText').textContent = '수정하기';
+  } else {
+    centerCol.classList.remove('is-read-mode');
+    readBody.style.display = 'none';
+    textarea.style.display = '';
+    charWrap.style.visibility = '';
+    autoWrap.style.visibility = '';
+    btn.classList.remove('confirmed', 'edit-mode');
+    document.getElementById('saveBtnIcon').textContent = '💾';
+    document.getElementById('saveBtnText').textContent = '저장하기';
+    setTimeout(() => textarea.focus(), 30);
+  }
+}
+
 // ── 저장버튼 상태 ──────────────────────
 function updateSaveBtn() {
-  const exists = !!diaries[currentDate];
+  if (isReadMode) return;
   const btn = document.getElementById('saveBtn');
-  document.getElementById('saveBtnIcon').textContent = exists ? '✏️' : '💾';
-  document.getElementById('saveBtnText').textContent = exists ? '수정하기' : '저장하기';
-  btn.classList.toggle('edit-mode', exists);
-  btn.classList.remove('confirmed');
+  btn.classList.remove('confirmed', 'edit-mode');
+  document.getElementById('saveBtnIcon').textContent = '💾';
+  document.getElementById('saveBtnText').textContent = '저장하기';
 }
 
 // ── 에디터 로드 ───────────────────────
@@ -361,10 +411,16 @@ function loadEditor(dateStr) {
 
   currentTags = entry.tags ? [...entry.tags] : [];
   renderTags();
-  updateSaveBtn();
   updateAutosaveLabel('saved');
   renderCalendar();
   renderDiaryList();
+
+  // 등록된 일기면 읽기모드, 없으면 쓰기모드
+  if (diaries[dateStr]) {
+    setMode('read');
+  } else {
+    setMode('write');
+  }
 }
 
 // ── 저장 ──────────────────────────────
@@ -390,7 +446,10 @@ function saveEntry(auto=false) {
     document.getElementById('saveBtnIcon').textContent = '✅';
     document.getElementById('saveBtnText').textContent = '저장됨!';
     showToast('일기가 저장되었어요 ✍️');
-    setTimeout(() => updateSaveBtn(), 1800);
+    setTimeout(() => {
+      if (diaries[currentDate]) setMode('read');
+      else updateSaveBtn();
+    }, 900);
   } else {
     updateSaveBtn();
   }
@@ -583,7 +642,10 @@ function init() {
 
   document.getElementById('titleInp').addEventListener('input', autoSave);
   document.getElementById('diaryTextarea').addEventListener('input',()=>{ updateCharCount(); autoSave(); });
-  document.getElementById('saveBtn').addEventListener('click',()=>saveEntry(false));
+  document.getElementById('saveBtn').addEventListener('click',()=>{
+    if (isReadMode) setMode('write');
+    else saveEntry(false);
+  });
 
   document.getElementById('deleteBtn').addEventListener('click',()=>{
     if(!diaries[currentDate]){showToast('삭제할 일기가 없어요.');return;}
@@ -593,6 +655,7 @@ function init() {
 
   document.querySelectorAll('.mood-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if (isReadMode) return;
       currentMood=currentMood===btn.dataset.mood?'':btn.dataset.mood;
       document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('active',b.dataset.mood===currentMood));
       autoSave();
@@ -601,6 +664,7 @@ function init() {
 
   document.querySelectorAll('.weather-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
+      if (isReadMode) return;
       currentWeather=currentWeather===btn.dataset.weather?'':btn.dataset.weather;
       document.querySelectorAll('.weather-btn').forEach(b=>b.classList.toggle('active',b.dataset.weather===currentWeather));
       autoSave();
@@ -616,7 +680,7 @@ function init() {
 
   document.getElementById('searchInp').addEventListener('input',renderDiaryList);
   document.getElementById('exportBtn').addEventListener('click',exportDiaries);
-  document.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveEntry(false);} });
+  document.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key==='s'){ e.preventDefault(); if(!isReadMode) saveEntry(false); } });
 }
 
 init();
